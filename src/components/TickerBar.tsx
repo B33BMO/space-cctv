@@ -3,11 +3,10 @@ import React from 'react';
 
 interface Launch {
   name: string;
-  window_start: string; // ISO date string
+  window_start: string;
 }
 
 export default function TickerBar({ launches }: { launches: Launch[] }) {
-  // Format launches as "Date | Launch Name"
   const items = launches.map(l => {
     const dt = new Date(l.window_start);
     const timeStr = dt.toLocaleString('en-US', {
@@ -25,7 +24,6 @@ export default function TickerBar({ launches }: { launches: Launch[] }) {
       <div className="relative w-full h-6">
         <div className="animate-marquee whitespace-nowrap text-white font-mono text-sm tracking-wide px-4">
           {items.join('   •   ')}
-          {/* Repeat once for infinite loop illusion */}
           <span className="mx-4" />
           {items.join('   •   ')}
         </div>
