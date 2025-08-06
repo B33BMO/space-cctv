@@ -15,11 +15,9 @@ export default function LaunchWall({ launches }: { launches: Launch[] }) {
 
   return (
 <div className="flex-1 flex flex-col overflow-hidden pb-8">
-          {/* Top TickerBar */}
       <div className="flex-none">
         <TickerBar launches={launches} />
       </div>
-      {/* CCTV Grid fills all space below the ticker */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-px bg-black h-full">
           {launches.map((launch) => (
@@ -33,7 +31,7 @@ export default function LaunchWall({ launches }: { launches: Launch[] }) {
           ))}
         </div>
       </div>
-      {/* Modal */}
+ 
       {modalStream && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 cursor-zoom-out"
