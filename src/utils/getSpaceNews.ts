@@ -21,7 +21,6 @@ export async function getSpaceNews(limit = 12) {
       );
     } catch (err) {
       console.warn(`Failed to fetch feed ${feed}:`, err.message || err);
-      // Just skip this feed
     }
   }
   news = news.sort(() => 0.5 - Math.random()).slice(0, limit);
