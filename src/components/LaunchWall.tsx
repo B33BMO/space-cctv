@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import LaunchPanel from "./LaunchPanel";
 import TickerBar from "./TickerBar";
+import type { Launch } from "@/utils/getLaunches";
 
 interface Launch {
   name: string;
