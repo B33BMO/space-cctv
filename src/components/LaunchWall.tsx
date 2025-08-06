@@ -4,12 +4,7 @@ import LaunchPanel from "./LaunchPanel";
 import TickerBar from "./TickerBar";
 import type { Launch } from "@/utils/getLaunches";
 
-interface Launch {
-  name: string;
-  stream: string | null;
-  image?: string | null;
-  window_start?: string;
-}
+
 
 export default function LaunchWall({ launches }: { launches: Launch[] }) {
   const [modalStream, setModalStream] = useState<null | { name: string; stream: string }>(null);
