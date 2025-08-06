@@ -1,5 +1,6 @@
 import React from "react";
 import Image from "next/image";
+
 interface Props {
   name: string;
   stream: string | null;
@@ -8,7 +9,7 @@ interface Props {
 
 export default function LaunchPanel({ name, stream, onStreamClick }: Props) {
   return (
-    <div className="bg-black border border-black overflow-hidden flex flex-col">
+    <div className="bg-black border border-black overflow-hidden flex flex-col h-full">
       <div className="aspect-video w-full bg-black relative">
         {stream ? (
           <div
@@ -28,14 +29,13 @@ export default function LaunchPanel({ name, stream, onStreamClick }: Props) {
         ) : (
           <div className="flex flex-col items-center justify-center w-full h-full bg-black relative">
             <Image
-  src="/tv-static.gif"
-  alt="Static"
-  fill
-  className="object-cover opacity-70"
-  style={{ position: 'absolute', inset: 0 }} // To keep absolute full cover
-  priority // since it's always in the viewport
-/>
-            <span className="z-10 text-white text-xl font-mono font-bold bg-black/90 px-3 py-2">
+              src="/tv-static.gif"
+              alt="Static"
+              fill
+              className="object-cover opacity-70"
+              priority // always loaded immediately
+            />
+            <span className="z-10 text-white text-xl font-mono font-bold bg-black/90 px-3 py-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
               //Error: Stream Unavailable.
             </span>
           </div>
