@@ -36,8 +36,9 @@ export default function LaunchPanel({ name, stream, onStreamClick }: Props) {
               priority
             />
             <span className="z-10 text-white text-xl font-mono font-bold bg-black/90 px-3 py-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              '//Error: Stream Unavailable.'
-            </span>
+  {'//Error: Stream Unavailable.'}
+</span>
+
           </div>
         )}
       </div>
