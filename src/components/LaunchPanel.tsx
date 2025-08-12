@@ -1,8 +1,7 @@
 "use client";
 import React, { useCallback } from "react";
-import Image from "next/image";
 import CountdownBadge from "./CountdownBadge";
-
+import SignalStatic from "./SignalStatic";
 interface Props {
   name: string;
   stream: string | null;
@@ -71,29 +70,15 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
             />
             <div className="absolute inset-0 cursor-zoom-in" />
           </>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Image
-              src="/tv-static.gif"
-              alt="Static"
-              fill
-              className="object-cover opacity-70"
-              priority
-            />
-            <span className="z-10 text-white text-xl font-mono font-bold bg-black/90 px-3 py-2">
-              {"//Error: Stream Unavailable."}
-            </span>
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-[0.04]"
-              style={{
-                background:
-                  "repeating-linear-gradient(0deg, #fff, #fff 1px, transparent 1px, transparent 3px)",
-                mixBlendMode: "overlay",
-              }}
-            />
-          </div>
-        )}
+) : (
+  <div className="absolute inset-0 flex items-center justify-center aspect-video w-full">
+  <SignalStatic className="absolute inset-0" fps={24} opacity={0.9} />
+  <span className="z-10 text-white text-xl font-mono font-bold bg-black/90 px-3 py-2">
+    {"//Error: Stream Unavailable."}
+  </span>
+</div>
+
+)}
 
         {/* Title bar */}
         <div className="absolute bottom-0 left-0 right-0 h-7 bg-black/80 border-t border-white/10 px-2 flex items-center">
