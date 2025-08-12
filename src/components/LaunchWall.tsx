@@ -1,84 +1,71 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import LaunchPanel from "./LaunchPanel";
 import SidebarSchedule from "./SidebarSchedule";
 import type { Launch } from "@/utils/getLaunches";
 
-export default function LaunchWall({ launches }: { launches: Launch[] }) {
-  const wallRef = useRef<HTMLDivElement | null>(null);
-  const [cols, setCols] = useState<number>(Math.min(4, Math.max(1, launches.length)));
-
-  // Compute the best column count so rows fit within the wall's height
-  useEffect(() => {
-    if (!wallRef.current) return;
-
-    const GAP = 1; // px, matches gap-px
-    const RATIO = 16 / 9;
-
-    const ro = new ResizeObserver(([entry]) => {
-      const cr = entry.contentRect;
-      const W = Math.floor(cr.width);
-      const H = Math.floor(cr.height);
-      if (!W || !H) return;
-
-      // Try from max columns down to 1 to find the largest that fits
-      const maxCols = Math.min(6, launches.length || 1); // cap for sanity
-      let chosen = 1;
-
-      for (let c = maxCols; c >= 1; c--) {
-        const colGaps = (c - 1) * GAP;
-        const tileW = (W - colGaps) / c;
-        const tileH = tileW / RATIO;
-
-        const rows = Math.ceil((launches.length || 1) / c);
-        const rowGaps = (rows - 1) * GAP;
-        const totalH = rows * tileH + rowGaps;
-
-        if (totalH <= H) {
-          chosen = c;
-          break;
-        }
-      }
-
-      setCols(chosen);
-    });
-
-    ro.observe(wallRef.current);
-    return () => ro.disconnect();
-  }, [launches.length]);
-
-  const gridStyle = useMemo<React.CSSProperties>(
-    () => ({ gridTemplateColumns: `repeat(${cols}, 1fr)` }),
-    [cols]
+function pickNextLaunch(list: Launch[]): Launch | null {
+  if (!list?.length) return null;
+  const sorted = [...list].sort(
+    (a, b) => new Date(a.window_start).getTime() - new Date(b.window_start).getTime()
   );
+  const now = Date.now();
+  const upcoming = sorted.find((l) => new Date(l.window_start).getTime() >= now);
+  return upcoming ?? sorted[0];
+}
+
+export default function LaunchWall({ launches }: { launches: Launch[] }) {
+  const [modalStream, setModalStream] =
+    useState<null | { name: string; stream: string }>(null);
+
+  const nextLaunch = useMemo(() => pickNextLaunch(launches), [launches]);
 
   return (
     <main className="h-screen w-screen bg-black overflow-hidden">
       <div className="h-full w-full flex">
-        {/* Sidebar */}
         <SidebarSchedule launches={launches} />
+        <div className="flex-1 h-full relative overflow-hidden">
+          <div className="h-full w-full flex items-center justify-center p-2">
+            {nextLaunch ? (
+              <div className="w-full max-w-6xl">
+              <LaunchPanel
+  name={nextLaunch.name}
+  stream={nextLaunch.stream}
+  windowStart={nextLaunch.window_start}  // <-- pass the ISO
+  onStreamClick={(stream) =>
+    setModalStream({ name: nextLaunch.name, stream })
+  }
+/>
 
-        {/* CCTV wall area measured by ResizeObserver */}
-        <div ref={wallRef} className="flex-1 h-full relative overflow-hidden">
-          <div
-            className="h-full w-full grid gap-px bg-black place-content-start"
-            style={gridStyle}
-          >
-            {launches.map((launch) => (
-              <div className="h-full" key={launch.name}>
-                <LaunchPanel
-                  name={launch.name}
-                  stream={launch.stream}
-                  onStreamClick={(stream) =>
-                    /* your modal setter in parent if needed */
-                    console.log("open modal with", stream)
-                  }
-                />
               </div>
-            ))}
+            ) : (
+              <div className="text-white font-mono text-sm opacity-70">
+                No launches found.
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {modalStream && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 cursor-zoom-out"
+          onClick={() => setModalStream(null)}
+        >
+          <div className="w-full h-full max-w-5xl max-h-[90vh] flex items-center justify-center">
+            <iframe
+              src={modalStream.stream.replace("watch?v=", "embed/")}
+              className="w-full h-full aspect-video bg-black"
+              allow="autoplay; encrypted-media; picture-in-picture; web-share"
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+              title={modalStream.name}
+            />
+          </div>
+        </div>
+      )}
     </main>
   );
 }

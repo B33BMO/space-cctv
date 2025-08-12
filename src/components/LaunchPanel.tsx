@@ -1,10 +1,12 @@
 "use client";
 import React, { useCallback } from "react";
 import Image from "next/image";
+import CountdownBadge from "./CountdownBadge";
 
 interface Props {
   name: string;
   stream: string | null;
+  windowStart?: string;              // <-- NEW
   onStreamClick?: (stream: string) => void;
 }
 
@@ -26,7 +28,7 @@ function normalizeStreamUrl(raw: string): string {
   }
 }
 
-export default function LaunchPanel({ name, stream, onStreamClick }: Props) {
+export default function LaunchPanel({ name, stream, windowStart, onStreamClick }: Props) {
   const handleActivate = useCallback(() => {
     if (stream) onStreamClick?.(stream);
   }, [stream, onStreamClick]);
@@ -68,9 +70,6 @@ export default function LaunchPanel({ name, stream, onStreamClick }: Props) {
               title={name}
             />
             <div className="absolute inset-0 cursor-zoom-in" />
-            <div className="absolute top-2 left-2 bg-white/10 text-white font-mono text-[10px] px-2 py-0.5 uppercase tracking-wider">
-              LIVE
-            </div>
           </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -96,18 +95,17 @@ export default function LaunchPanel({ name, stream, onStreamClick }: Props) {
           </div>
         )}
 
-        {/* Fixed-height title bar overlay (keeps tiles uniform) */}
+        {/* Title bar */}
         <div className="absolute bottom-0 left-0 right-0 h-7 bg-black/80 border-t border-white/10 px-2 flex items-center">
-          <span
-            className="text-white font-mono text-[11px] truncate"
-            title={name}
-          >
+          <span className="text-white font-mono text-[11px] truncate" title={name}>
             {name}
           </span>
         </div>
 
-        {/* Subtle hover outline for affordance */}
-        <div className="absolute inset-0 ring-0 group-hover:ring-1 ring-white/30 pointer-events-none transition" />
+        {/* Countdown in top-right */}
+        <div className="absolute top-2 right-2">
+          <CountdownBadge iso={windowStart} />
+        </div>
       </div>
     </div>
   );
