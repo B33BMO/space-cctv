@@ -1,7 +1,6 @@
 import { getLaunches } from "@/utils/getLaunches";
 import { getSpaceNews } from "@/utils/getSpaceNews";
 import LaunchWall from "@/components/LaunchWall";
-import NewsTickerBar from "@/components/NewsTickerBar";
 
 export default async function Home() {
   const launches = await getLaunches();
@@ -10,7 +9,6 @@ export default async function Home() {
   return (
     <>
       <LaunchWall launches={launches} />
-      <NewsTickerBar news={news} />
     </>
   );
 }
