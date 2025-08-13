@@ -1,4 +1,6 @@
 // src/utils/getSpaceNews.ts
+import type Parser from "rss-parser";
+import type { ParserOptions } from "rss-parser";
 export interface NewsItem {
   title: string;
   link: string;
@@ -19,8 +21,8 @@ const FEEDS = [
   // "https://feeds.arstechnica.com/arstechnica/space", // often 404s
 ];
 
+/** Minimal File polyfill for Node during Next.js server build. */
 function ensureNodeFilePolyfill(): void {
-  // Only polyfill if missing
   if (typeof (globalThis as { File?: unknown }).File !== "undefined") return;
 
   class NodeFile extends Blob implements File {
@@ -45,17 +47,28 @@ function ensureNodeFilePolyfill(): void {
   });
 }
 
-export async function getSpaceNews(limit = 12): Promise<NewsItem[]> {
-  // ✅ Make sure File exists BEFORE loading rss-parser
+/** Instance + module shapes so TS knows what the dynamic import returns. */
+type RssParserInstance = Parser<unknown, RssItem>;
+type RssParserModule = {
+  default: new (opts?: ParserOptions<unknown, RssItem>) => RssParserInstance;
+};
+
+/** Load and return a typed rss-parser instance after the File polyfill is in place. */
+async function createParser(): Promise<RssParserInstance> {
   ensureNodeFilePolyfill();
 
-  // ✅ Dynamically import after polyfill so the lib sees File
-  const { default: Parser } = await import("rss-parser");
+  const { default: Parser } = (await import("rss-parser")) as RssParserModule;
 
-  // Parser<FeedCustom, ItemCustom>
-  const parser: InstanceType<typeof Parser<RssItem>> = new (Parser as unknown as {
-    new <F = unknown, I = RssItem>(opts?: ConstructorParameters<typeof Parser>[0]): Parser<F, I>;
-  })({ customFields: { item: ["contentSnippet"] } });
+  // Note: constructor is not generic; we type the instance instead.
+  const parser = new Parser({
+    customFields: { item: ["contentSnippet"] },
+  });
+  return parser;
+}
+
+/** Fetch a handful of recent space news items from multiple feeds. */
+export async function getSpaceNews(limit = 12): Promise<NewsItem[]> {
+  const parser = await createParser();
 
   const perFeed = Math.max(1, Math.ceil(limit / FEEDS.length));
   const results: NewsItem[] = [];
@@ -72,12 +85,12 @@ export async function getSpaceNews(limit = 12): Promise<NewsItem[]> {
           contentSnippet: it.contentSnippet ?? "",
         });
       }
-    } catch (err: unknown) {
+    } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`Failed to fetch feed ${url}: ${msg}`);
     }
   }
 
-  // Light shuffle then clamp
+  // Light shuffle, then clamp
   return results.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
