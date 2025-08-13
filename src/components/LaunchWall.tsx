@@ -1,71 +1,112 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import LaunchPanel from "./LaunchPanel";
-import SidebarSchedule from "./SidebarSchedule";
-import type { Launch } from "@/utils/getLaunches";
+import React, { useCallback } from "react";
+import CountdownBadge from "./CountdownBadge";
+import SignalStatic from "./SignalStatic";
 
-function pickNextLaunch(list: Launch[]): Launch | null {
-  if (!list?.length) return null;
-  const sorted = [...list].sort(
-    (a, b) => new Date(a.window_start).getTime() - new Date(b.window_start).getTime()
-  );
-  const now = Date.now();
-  const upcoming = sorted.find((l) => new Date(l.window_start).getTime() >= now);
-  return upcoming ?? sorted[0];
+interface Props {
+  name: string;
+  stream: string | null;
+  windowStart?: string;              // ISO for countdown (only when UTC known)
+  onStreamClick?: (stream: string) => void;
 }
 
-export default function LaunchWall({ launches }: { launches: Launch[] }) {
-  const [modalStream, setModalStream] =
-    useState<null | { name: string; stream: string }>(null);
+function normalizeStreamUrl(raw: string): string {
+  try {
+    if (/\/embed\//i.test(raw)) return raw;
+    if (/youtube\.com\/watch\?v=/i.test(raw)) {
+      const url = new URL(raw);
+      const id = url.searchParams.get("v");
+      return id ? `https://www.youtube.com/embed/${id}` : raw;
+    }
+    if (/youtu\.be\//i.test(raw)) {
+      const id = raw.split("youtu.be/")[1]?.split(/[?&#]/)[0];
+      return id ? `https://www.youtube.com/embed/${id}` : raw;
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
+}
 
-  const nextLaunch = useMemo(() => pickNextLaunch(launches), [launches]);
+export default function LaunchPanel({ name, stream, windowStart, onStreamClick }: Props) {
+  const handleActivate = useCallback(() => {
+    if (stream) onStreamClick?.(stream);
+  }, [stream, onStreamClick]);
+
+  const handleKey = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!stream) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onStreamClick?.(stream);
+      }
+    },
+    [stream, onStreamClick]
+  );
+
+  const embed = stream ? normalizeStreamUrl(stream) : null;
 
   return (
-    <main className="h-screen w-screen bg-black overflow-hidden">
-      <div className="h-full w-full flex">
-        <SidebarSchedule launches={launches} />
-        <div className="flex-1 h-full relative overflow-hidden">
-          <div className="h-full w-full flex items-center justify-center p-2">
-            {nextLaunch ? (
-              <div className="w-full max-w-6xl">
-              <LaunchPanel
-  name={nextLaunch.name}
-  stream={nextLaunch.stream}
-  windowStart={nextLaunch.window_start}  // <-- pass the ISO
-  onStreamClick={(stream) =>
-    setModalStream({ name: nextLaunch.name, stream })
-  }
-/>
-
-              </div>
-            ) : (
-              <div className="text-white font-mono text-sm opacity-70">
-                No launches found.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {modalStream && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 cursor-zoom-out"
-          onClick={() => setModalStream(null)}
-        >
-          <div className="w-full h-full max-w-5xl max-h-[90vh] flex items-center justify-center">
+    <div className="bg-black border border-black overflow-hidden h-full">
+      <div
+        className="relative aspect-video w-full bg-black group"
+        role={embed ? "button" : undefined}
+        tabIndex={embed ? 0 : -1}
+        aria-label={embed ? `Maximize stream: ${name}` : `No stream available for ${name}`}
+        onClick={embed ? handleActivate : undefined}
+        onKeyDown={embed ? handleKey : undefined}
+        title={embed ? "Click to maximize" : undefined}
+      >
+        {embed ? (
+          <>
             <iframe
-              src={modalStream.stream.replace("watch?v=", "embed/")}
-              className="w-full h-full aspect-video bg-black"
+              src={embed}
+              className="w-full h-full pointer-events-none"
               allow="autoplay; encrypted-media; picture-in-picture; web-share"
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
-              title={modalStream.name}
+              title={name}
+            />
+            <div className="absolute inset-0 cursor-zoom-in" />
+          </>
+        ) : (
+          // Static with a big centered countdown; if no ISO, we fall back to the badge (or nothing)
+          <div className="absolute inset-0 flex items-center justify-center">
+            <SignalStatic className="absolute inset-0" fps={24} opacity={0.9} />
+            {windowStart ? (
+              <CountdownBadge iso={windowStart} variant="big" className="z-10 bg-black/50 px-4 py-2" />
+            ) : (
+              <div className="z-10 text-white/80 font-mono text-xl bg-black/70 px-3 py-2">
+                {"No precise time yet."}
+              </div>
+            )}
+            {/* subtle CRT scanline vibe */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.04]"
+              style={{
+                background:
+                  "repeating-linear-gradient(0deg, #fff, #fff 1px, transparent 1px, transparent 3px)",
+                mixBlendMode: "overlay",
+              }}
             />
           </div>
+        )}
+
+        {/* Title bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-7 bg-black/80 border-t border-white/10 px-2 flex items-center">
+          <span className="text-white font-mono text-[11px] truncate" title={name}>
+            {name}
+          </span>
         </div>
-      )}
-    </main>
+
+        {/* Small badge in the corner (kept) */}
+        <div className="absolute top-2 right-2">
+          <CountdownBadge iso={windowStart} />
+        </div>
+      </div>
+    </div>
   );
 }

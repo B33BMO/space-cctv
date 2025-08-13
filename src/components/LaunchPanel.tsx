@@ -1,11 +1,12 @@
 "use client";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import CountdownBadge from "./CountdownBadge";
 import SignalStatic from "./SignalStatic";
+
 interface Props {
   name: string;
   stream: string | null;
-  windowStart?: string;              // <-- NEW
+  windowStart?: string;              // ISO for countdown (UTC/GMT only)
   onStreamClick?: (stream: string) => void;
 }
 
@@ -45,6 +46,44 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
 
   const embed = stream ? normalizeStreamUrl(stream) : null;
 
+  // --- BIG CENTER COUNTDOWN (client-side, independent of CountdownBadge) ---
+  // parse target once
+  const targetMs = useMemo(() => (windowStart ? Date.parse(windowStart) : NaN), [windowStart]);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (Number.isNaN(targetMs)) return;
+    // align to next second to avoid jitter
+    const startDelay = 1000 - (Date.now() % 1000);
+    const kick = setTimeout(() => {
+      setNowMs(Date.now());
+      const id = setInterval(() => setNowMs(Date.now()), 1000);
+      (kick as any)._interval = id;
+    }, startDelay);
+
+    return () => {
+      clearTimeout(kick);
+      if ((kick as any)._interval) clearInterval((kick as any)._interval);
+    };
+  }, [targetMs]);
+
+  const bigCountdownLabel = useMemo(() => {
+    if (Number.isNaN(targetMs)) return null;
+    const diff = targetMs - nowMs; // future => +
+    const past = diff < 0;
+    const abs = Math.abs(diff);
+    const total = Math.floor(abs / 1000);
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const core = days > 0
+      ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+      : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return `${past ? "T+" : "T-"} ${core}`;
+  }, [targetMs, nowMs]);
+
   return (
     <div className="bg-black border border-black overflow-hidden h-full">
       <div
@@ -70,15 +109,36 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
             />
             <div className="absolute inset-0 cursor-zoom-in" />
           </>
-) : (
-  <div className="absolute inset-0 flex items-center justify-center aspect-video w-full">
-  <SignalStatic className="absolute inset-0" fps={24} opacity={0.9} />
-  <span className="z-10 text-white text-xl font-mono font-bold bg-black/90 px-3 py-2">
-    {"//Error: Stream Unavailable."}
-  </span>
-</div>
-
-)}
+        ) : (
+          // Static background + BIG centered countdown
+          <div className="absolute inset-0 flex items-center justify-center">
+            <SignalStatic className="absolute inset-0" fps={24} opacity={0.9} />
+            {bigCountdownLabel ? (
+              <div
+                className="z-10 text-white font-mono font-bold bg-black/50 px-4 py-2 rounded-sm select-none
+                           text-3xl sm:text-4xl md:text-5xl lg:text-6xl"
+                title={new Date(targetMs).toUTCString()}
+                suppressHydrationWarning
+              >
+                {bigCountdownLabel}
+              </div>
+            ) : (
+              <div className="z-10 text-white/80 font-mono text-xl bg-black/70 px-3 py-2 rounded-sm select-none">
+                No precise time yet.
+              </div>
+            )}
+            {/* subtle CRT scanline overlay */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.04]"
+              style={{
+                background:
+                  "repeating-linear-gradient(0deg, #fff, #fff 1px, transparent 1px, transparent 3px)",
+                mixBlendMode: "overlay",
+              }}
+            />
+          </div>
+        )}
 
         {/* Title bar */}
         <div className="absolute bottom-0 left-0 right-0 h-7 bg-black/80 border-t border-white/10 px-2 flex items-center">
@@ -87,7 +147,7 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
           </span>
         </div>
 
-        {/* Countdown in top-right */}
+        {/* Small corner badge retained (it will render nothing if iso is missing/invalid) */}
         <div className="absolute top-2 right-2">
           <CountdownBadge iso={windowStart} />
         </div>
