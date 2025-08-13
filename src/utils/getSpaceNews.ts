@@ -7,14 +7,9 @@ export interface NewsItem {
   contentSnippet: string;
 }
 
-declare global {
-  // Polyfill globalThis.File for Node environments that lack it
-  // This avoids RSS-parser crashing during Next.js server build
-  // eslint-disable-next-line no-var
-  var __hasFilePolyfill__: boolean | undefined;
-}
-
-if (typeof globalThis.File === "undefined" && !globalThis.__hasFilePolyfill__) {
+// Minimal File polyfill for Node during Next.js server build.
+// Avoids rss-parser or its deps crashing when they check for File.
+if (typeof (globalThis as unknown as { File?: unknown }).File === "undefined") {
   class NodeFile extends Blob implements File {
     readonly name: string;
     readonly lastModified: number;
@@ -28,42 +23,55 @@ if (typeof globalThis.File === "undefined" && !globalThis.__hasFilePolyfill__) {
       return "File";
     }
   }
-  // @ts-expect-error: Assigning to globalThis
-  globalThis.File = NodeFile;
-  globalThis.__hasFilePolyfill__ = true;
+  Object.defineProperty(globalThis, "File", {
+    value: NodeFile,
+    configurable: true,
+    enumerable: false,
+    writable: false,
+  });
 }
 
-export async function getSpaceNews(limit = 10): Promise<NewsItem[]> {
-  const parser: Parser<unknown, NewsItem> = new Parser({
-    customFields: {
-      item: ["contentSnippet"],
-    },
+type RssItem = {
+  title?: string;
+  link?: string;
+  pubDate?: string;
+  contentSnippet?: string;
+};
+
+const FEEDS = [
+  "https://spaceflightnow.com/feed/",
+  "https://www.nasa.gov/news-release/feed/",
+  // Ars feed often 404s; skip or add others if you like:
+  // "https://www.spacex.com/updates/feed/",  // example if you want more
+];
+
+export async function getSpaceNews(limit = 12): Promise<NewsItem[]> {
+  // Parser<FeedCustom, ItemCustom>
+  const parser: Parser<unknown, RssItem> = new Parser({
+    customFields: { item: ["contentSnippet"] },
   });
 
-  const feedUrls = [
-    "https://www.nasa.gov/rss/dyn/breaking_news.rss",
-    "https://www.space.com/feeds/all",
-  ];
+  const perFeed = Math.max(1, Math.ceil(limit / FEEDS.length));
+  const results: NewsItem[] = [];
 
-  try {
-    const results: NewsItem[] = [];
-    for (const url of feedUrls) {
-      // @ts-expect-error: rss-parser types don't include contentSnippet
-      const feed = await parser.parseURL(url);
-      if (feed.items) {
-        for (const item of feed.items.slice(0, limit)) {
-          results.push({
-            title: item.title ?? "",
-            link: item.link ?? "",
-            pubDate: item.pubDate ?? "",
-            contentSnippet: (item as NewsItem).contentSnippet ?? "",
-          });
-        }
+  for (const url of FEEDS) {
+    try {
+      const feed = await parser.parseURL(url); // Output<unknown, RssItem>
+      const items = (feed.items ?? []).slice(0, perFeed);
+      for (const it of items) {
+        results.push({
+          title: it.title ?? "",
+          link: it.link ?? "#",
+          pubDate: it.pubDate ?? "",
+          contentSnippet: it.contentSnippet ?? "",
+        });
       }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`Failed to fetch feed ${url}: ${msg}`);
     }
-    return results;
-  } catch (error) {
-    console.error("Failed to fetch space news:", error);
-    return [];
   }
+
+  // Light shuffle then clamp
+  return results.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
