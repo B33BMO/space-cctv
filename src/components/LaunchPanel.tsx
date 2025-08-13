@@ -1,12 +1,12 @@
 "use client";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CountdownBadge from "./CountdownBadge";
 import SignalStatic from "./SignalStatic";
 
 interface Props {
   name: string;
   stream: string | null;
-  windowStart?: string;              // ISO for countdown (UTC/GMT only)
+  windowStart?: string; // ISO for countdown (UTC/GMT only)
   onStreamClick?: (stream: string) => void;
 }
 
@@ -46,24 +46,30 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
 
   const embed = stream ? normalizeStreamUrl(stream) : null;
 
-  // --- BIG CENTER COUNTDOWN (client-side, independent of CountdownBadge) ---
-  // parse target once
+  // ---- Big center countdown for "no stream" state ----
   const targetMs = useMemo(() => (windowStart ? Date.parse(windowStart) : NaN), [windowStart]);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    // cleanup old timers
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    timeoutRef.current = null;
+    intervalRef.current = null;
+
     if (Number.isNaN(targetMs)) return;
-    // align to next second to avoid jitter
+
     const startDelay = 1000 - (Date.now() % 1000);
-    const kick = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       setNowMs(Date.now());
-      const id = setInterval(() => setNowMs(Date.now()), 1000);
-      (kick as any)._interval = id;
+      intervalRef.current = setInterval(() => setNowMs(Date.now()), 1000);
     }, startDelay);
 
     return () => {
-      clearTimeout(kick);
-      if ((kick as any)._interval) clearInterval((kick as any)._interval);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [targetMs]);
 
@@ -78,9 +84,9 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
     const minutes = Math.floor((total % 3600) / 60);
     const seconds = total % 60;
     const pad = (n: number) => String(n).padStart(2, "0");
-    const core = days > 0
-      ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-      : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    const core =
+      days > 0 ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+               : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
     return `${past ? "T+" : "T-"} ${core}`;
   }, [targetMs, nowMs]);
 
@@ -110,7 +116,6 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
             <div className="absolute inset-0 cursor-zoom-in" />
           </>
         ) : (
-          // Static background + BIG centered countdown
           <div className="absolute inset-0 flex items-center justify-center">
             <SignalStatic className="absolute inset-0" fps={24} opacity={0.9} />
             {bigCountdownLabel ? (
@@ -127,7 +132,7 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
                 No precise time yet.
               </div>
             )}
-            {/* subtle CRT scanline overlay */}
+            {/* subtle scanline overlay */}
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0 opacity-[0.04]"
@@ -147,7 +152,7 @@ export default function LaunchPanel({ name, stream, windowStart, onStreamClick }
           </span>
         </div>
 
-        {/* Small corner badge retained (it will render nothing if iso is missing/invalid) */}
+        {/* Small corner badge (renders nothing if iso is missing/invalid) */}
         <div className="absolute top-2 right-2">
           <CountdownBadge iso={windowStart} />
         </div>

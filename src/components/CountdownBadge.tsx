@@ -1,13 +1,12 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type Props = {
   iso?: string | null;
-  variant?: "badge" | "big"; // "badge" = small pill (default), "big" = hero countdown
-  className?: string;        // optional extra classes
+  variant?: "badge" | "big";
+  className?: string;
 };
 
-/** Normalize various ISO/UTC strings to a UTC millisecond timestamp. */
 function toUtcMs(input?: string | null): number {
   if (!input) return NaN;
   let ms = Date.parse(input);
@@ -15,10 +14,8 @@ function toUtcMs(input?: string | null): number {
   const isoNoZ = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(input);
   if (isoNoZ) {
     ms = Date.parse(input + "Z");
-    if (!Number.isNaN(ms)) return ms;
   }
-  ms = Date.parse(input.replace(/\./g, "")); // e.g., "Aug." -> "Aug"
-  return ms;
+  return Number.isNaN(ms) ? NaN : ms;
 }
 
 export default function CountdownBadge({ iso, variant = "badge", className = "" }: Props) {
@@ -27,50 +24,49 @@ export default function CountdownBadge({ iso, variant = "badge", className = "" 
 
   const targetMs = useMemo(() => toUtcMs(iso), [iso]);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Tick aligned to next second boundary
   useEffect(() => {
     if (!mounted || Number.isNaN(targetMs)) return;
+
+    // clear any previous timers
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    timeoutRef.current = null;
+    intervalRef.current = null;
+
     const startDelay = 1000 - (Date.now() % 1000);
-    const kick = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       setNowMs(Date.now());
-      const id = setInterval(() => setNowMs(Date.now()), 1000);
-      (kick as any)._interval = id;
+      intervalRef.current = setInterval(() => setNowMs(Date.now()), 1000);
     }, startDelay);
 
     return () => {
-      clearTimeout(kick);
-      if ((kick as any)._interval) clearInterval((kick as any)._interval);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [mounted, targetMs]);
 
   if (!mounted || Number.isNaN(targetMs)) return null;
 
-  const diff = targetMs - nowMs; // future => +
+  const diff = targetMs - nowMs;
   const past = diff < 0;
   const abs = Math.abs(diff);
-
   const totalSec = Math.floor(abs / 1000);
   const days = Math.floor(totalSec / 86400);
   const hours = Math.floor((totalSec % 86400) / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
   const seconds = totalSec % 60;
-
   const pad = (n: number) => String(n).padStart(2, "0");
-  const core =
-    days > 0
-      ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-      : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  const core = days > 0 ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+                        : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
   const label = `${past ? "T+" : "T-"} ${core}`;
 
   if (variant === "big") {
-    // Large, center-stage countdown (no border)
     return (
       <div
-        className={`text-white font-mono font-bold select-none ${
-          // responsive sizes: sm / md / lg
-          "text-3xl sm:text-4xl md:text-5xl lg:text-6xl"
-        } ${className}`}
+        className={`text-white font-mono font-bold select-none text-3xl sm:text-4xl md:text-5xl lg:text-6xl ${className}`}
         title={new Date(targetMs).toUTCString()}
         suppressHydrationWarning
       >
@@ -79,7 +75,6 @@ export default function CountdownBadge({ iso, variant = "badge", className = "" 
     );
   }
 
-  // Default: small pill
   return (
     <div
       className={`bg-black/80 text-white font-mono text-[11px] px-2 py-1 border border-white/20 ${className}`}
