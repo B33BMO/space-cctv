@@ -9,6 +9,30 @@ const parser = new Parser({
     "user-agent": "SpaceCCTV/1.0 (+https://example.com)",
   },
 });
+// Node runtimes used at build often lack globalThis.File.
+// Provide a minimal polyfill so modules that sniff for File don't crash.
+declare global {
+  // allow attaching our polyfill only once
+  // eslint-disable-next-line no-var
+  var __hasFilePolyfill__: boolean | undefined;
+}
+if (typeof globalThis.File === "undefined" && !globalThis.__hasFilePolyfill__) {
+  class NodeFile extends Blob implements File {
+    readonly name: string;
+    readonly lastModified: number;
+    readonly webkitRelativePath = "";
+    constructor(parts: BlobPart[], name: string, options: FilePropertyBag = {}) {
+      super(parts, options);
+      this.name = name;
+      this.lastModified = options.lastModified ?? Date.now();
+    }
+    get [Symbol.toStringTag](): string {
+      return "File";
+    }
+  }
+  globalThis.File = NodeFile;
+  globalThis.__hasFilePolyfill__ = true;
+}
 
 // Pick stable feeds. (Removed the 404 Ars link.)
 const FEEDS = [
