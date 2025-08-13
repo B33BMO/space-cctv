@@ -9,7 +9,7 @@ export interface NewsItem {
 
 // Minimal File polyfill for Node during Next.js server build.
 // Avoids rss-parser or its deps crashing when they check for File.
-if (typeof (globalThis as unknown as { File?: unknown }).File === "undefined") {
+if (typeof (globalThis as { File?: unknown }).File === "undefined") {
   class NodeFile extends Blob implements File {
     readonly name: string;
     readonly lastModified: number;
@@ -41,8 +41,7 @@ type RssItem = {
 const FEEDS = [
   "https://spaceflightnow.com/feed/",
   "https://www.nasa.gov/news-release/feed/",
-  // Ars feed often 404s; skip or add others if you like:
-  // "https://www.spacex.com/updates/feed/",  // example if you want more
+  // "https://feeds.arstechnica.com/arstechnica/space", // often 404s
 ];
 
 export async function getSpaceNews(limit = 12): Promise<NewsItem[]> {
